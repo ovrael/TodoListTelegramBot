@@ -1,0 +1,58 @@
+# ===== Wyniki kompilacji .NET =====
+[Bb]in/
+[Oo]bj/
+[Dd]ebug/
+[Rr]elease/
+[Ll]og/
+[Ll]ogs/
+artifacts/
+publish/
+out/
+*.nupkg
+*.snupkg
+
+# ===== Sekrety i konfiguracja lokalna =====
+.env
+.env.*
+!.env.example
+*.env
+secrets.json
+appsettings.*.local.json
+appsettings.Local.json
+appsettings.Development.json
+*.pfx
+*.pem
+*.key
+
+# ===== Pliki tymczasowe i cache =====
+*.tmp
+*.log
+*.cache
+*.swp
+*~
+TestResults/
+coverage/
+*.coverage
+*.coveragexml
+
+# ===== Pliki IDE =====
+# VS Code: zostaw tylko współdzielone ustawienia
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# Visual Studio
+.vs/
+*.user
+*.suo
+*.userprefs
+
+# JetBrains Rider
+.idea/
+*.sln.iml
+
+# ===== System operacyjny =====
+.DS_Store
+Thumbs.db
