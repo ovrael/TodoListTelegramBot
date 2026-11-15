@@ -10,4 +10,7 @@ public class Project
 
     [JsonPropertyName("description")]
     public string Description { get; set; } = string.Empty;
+
+    [JsonPropertyName("is_archived")]
+    public bool IsArchived { get; set; } = false;
 }

@@ -66,13 +66,8 @@ public class TelegramService
             new Command("/projects", "List current Vikunja projects", CommandList.OnProjects),
             new Command(
                 "/tasks",
-                "List current Vikunja tasks from newest to oldest",
-                CommandList.OnTasksNewFirst
-            ),
-            new Command(
-                "/tasks_newest",
                 "List current Vikunja tasks from oldest to newest",
-                CommandList.OnTasksOldFirst
+                CommandList.OnTasks
             ),
         ];
     }
@@ -126,25 +121,58 @@ public class TelegramService
 
     async Task OnTextTodoMessage(Message message)
     {
-        System.Console.WriteLine($"Analyzing message text");
+        System.Console.WriteLine($"Analyzing message text, created to task for Vikunja");
         var analysis = TextMessageAnalyzer.Analyze(message.Text!);
-        if (analysis is null)
+
+        if (!analysis.IsValid)
         {
-            System.Console.WriteLine(
-                $"TextMessageAnalyzer returned null, suspicious and cannot be handled. Sets reaction to ({ReactionEmoji.ThinkingFace})."
-            );
-            await bot.SendMessage(
-                message.Chat.Id,
-                $"FAIL (more in logs), nothing was sent to Vikunja."
-            );
-            await bot.SetMessageReaction(message.Chat.Id, message.Id, [ReactionEmoji.ThinkingFace]);
+            await bot.SendMessage(message.Chat.Id, "Task title is empty.");
             return;
         }
 
-        await bot.SendMessage(
-            message.Chat.Id,
-            $"Analyzed message. Sent to Vikunja's board: [BOARD NAME]. Sets reaction to ({ReactionEmoji.OkHand})."
-        );
+        long projectId;
+        if (analysis.ProjectName is null)
+        {
+            System.Console.WriteLine(
+                "No project name in massage, set to default user project or 0"
+            );
+            // No #project in message, get default project id
+            var settings = await vikunjaService.GetUserSettings();
+            projectId = settings?.DefaultProjectId ?? 0;
+        }
+        else
+        {
+            var project = await vikunjaService.FindProjectByName(analysis.ProjectName);
+            if (project is null)
+            {
+                System.Console.WriteLine(
+                    $"Cannot find project with name {analysis.ProjectName}, set to default user project or 0"
+                );
+                var settings = await vikunjaService.GetUserSettings();
+                projectId = settings?.DefaultProjectId ?? 0;
+            }
+            else
+                projectId = project.Id;
+        }
+
+        System.Console.WriteLine($"Trying to add task to Project ({projectId})");
+
+        if (!await vikunjaService.AddTask(projectId, analysis.CreatePostTask()!))
+        {
+            System.Console.WriteLine("Cannot create task!");
+            await bot.SendMessage(
+                message.Chat.Id,
+                "FAIL (more in logs), nothing was sent to Vikunja."
+            );
+            return;
+        }
+
+        System.Console.WriteLine("Task created!");
+
+        // await bot.SendMessage(
+        //     message.Chat.Id,
+        //     $"Analyzed message. Sent to Vikunja's board: {analysis.ProjectName}. Sets reaction to ({ReactionEmoji.OkHand})."
+        // );
 
         await bot.SetMessageReaction(message.Chat.Id, message.Id, [ReactionEmoji.OkHand]);
     }

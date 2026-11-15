@@ -3,62 +3,37 @@ using Telegram.Bot.Types;
 
 public static class CommandList
 {
+    private static readonly string nullRespond = "Received null from Vikunja API";
+
     public static async Task OnProjects(
         TelegramBotClient bot,
         VikunjaService vikunja,
         Message message
     )
     {
-        var projects = await vikunja.GetProjects();
-        string respond;
-        if (projects is null)
-            respond = "Received null from Vikunja API";
-        else
+        var projects = await vikunja.GetActiveProjects();
+        string respond = nullRespond;
+        if (projects is not null)
             respond =
-                $"Current Vikunja projects I can see:\n\t• "
+                $"Active Vikunja projects I can see:\n\t• "
                 + string.Join("\n\t• ", projects.Select(p => p.Title));
 
         await bot.SendMessage(message.Chat.Id, respond);
     }
 
-    internal static async Task OnTasksNewFirst( // newer will be higher on list
+    internal static async Task OnTasks( // newer will be on the bottom of list
         TelegramBotClient bot,
         VikunjaService vikunja,
         Message message
-    ) => await OnTasks(bot, vikunja, message, false);
-
-    internal static async Task OnTasksOldFirst( // newer will be on the bottom of list
-        TelegramBotClient bot,
-        VikunjaService vikunja,
-        Message message
-    ) => await OnTasks(bot, vikunja, message, true);
-
-    internal static async Task OnTasks(
-        TelegramBotClient bot,
-        VikunjaService vikunja,
-        Message message,
-        bool oldFirst
     )
     {
         var tasks = await vikunja.GetTasks();
-        string respond = "Received null from Vikunja API";
+        string respond = nullRespond;
         if (tasks is not null)
         {
-            string direction;
-            if (oldFirst)
-            {
-                direction = "older -> newer";
-                tasks = tasks.OrderBy(t => t.Created).ToArray();
-            }
-            else
-            {
-                direction = "newer -> older";
-                tasks = tasks.OrderByDescending(t => t.Created).ToArray();
-            }
-
             respond =
-                $"Current tasks ({direction}):\n\t• "
-                + string.Join("\n\t• ", tasks.Select(p => p.Title));
+                $"Current tasks (older -> newer):\n\t• "
+                + string.Join("\n\t• ", tasks.OrderBy(t => t.Created).Select(p => p.Title));
         }
         await bot.SendMessage(message.Chat.Id, respond);
     }

@@ -49,6 +49,23 @@ public class VikunjaService
         return items.Deserialize<Project[]>();
     }
 
+    public async Task<Project[]?> GetActiveProjects()
+    {
+        var projects = await GetProjects();
+        if (projects is null)
+            return null;
+
+        return projects.Where(p => !p.IsArchived).ToArray();
+    }
+
+    public async Task<Project?> FindProjectByName(string name)
+    {
+        var projects = await GetActiveProjects();
+        return projects?.FirstOrDefault(p =>
+            string.Equals(p.Title, name, StringComparison.OrdinalIgnoreCase)
+        );
+    }
+
     internal async Task<VikunjaTask[]?> GetTasks()
     {
         var response = await client.GetAsync("tasks");
@@ -63,17 +80,9 @@ public class VikunjaService
         return items.Deserialize<VikunjaTask[]>();
     }
 
-    internal async Task<bool> AddTask(TextMessageAnalysis analysis)
+    internal async Task<bool> AddTask(long projectId, PostVikunjaTask task)
     {
-        var task = new
-        {
-            title = analysis.Text,
-            description = string.Empty,
-            priority = analysis.Priority,
-            due_date = analysis.Date,
-        };
-
-        var response = await client.PostAsJsonAsync($"projects/{analysis.ProjectId}/tasks", task);
+        var response = await client.PostAsJsonAsync($"projects/{projectId}/tasks", task);
         if (!response.IsSuccessStatusCode)
         {
             System.Console.WriteLine(await response.Content.ReadAsStringAsync());
