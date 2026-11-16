@@ -2,10 +2,12 @@
 
 A Telegram bot that connects to a self-hosted [Vikunja](https://vikunja.io/) instance. It lets you browse your Vikunja projects and tasks from a private Telegram chat.
 
+> **Note:** The bot is written for the **Vikunja API v2** (`/api/v2/`). It does not support API v1.
+
 ## Requirements
 
 - [.NET 10 SDK](https://dotnet.microsoft.com/download)
-- A running Vikunja instance
+- A running Vikunja instance with API v2 (`/api/v2/`)
 - A Telegram bot created with [@BotFather](https://t.me/BotFather)
 
 ## Configuration
@@ -14,7 +16,7 @@ The bot does not keep any secrets in the source code. It reads all values from c
 
 | Key | Environment variable | Required | Description |
 |---|---|---|---|
-| `Vikunja:Uri` | `Vikunja__Uri` | Yes | Base URL of the Vikunja API, including the API path and a trailing slash. Example: `https://vikunja.example.com/api/v2/` |
+| `Vikunja:Uri` | `Vikunja__Uri` | Yes | Base URL of the Vikunja API v2, including the `/api/v2/` path and a trailing slash. Example: `https://vikunja.example.com/api/v2/` |
 | `Vikunja:Token` | `Vikunja__Token` | Yes | Vikunja API token. Starts with `tk_`. |
 | `Telegram:Token` | `Telegram__Token` | Yes | Telegram bot token from @BotFather. Format: `123456789:ABC...` |
 | `Telegram:AllowedUserIds` | `Telegram__AllowedUserIds` | Yes | Comma-separated list of numeric Telegram user IDs that can use the bot. Example: `123456789,987654321` |
@@ -22,7 +24,7 @@ The bot does not keep any secrets in the source code. It reads all values from c
 ### How to get the values
 
 **`Vikunja:Uri`**
-Use the address of your Vikunja server with the API path. The trailing slash (`/`) is required.
+Use the address of your Vikunja server with the API v2 path (`/api/v2/`). The bot does not work with `/api/v1/`. The trailing slash (`/`) is required.
 
 **`Vikunja:Token`**
 1. In Vikunja, open **Settings → API Tokens**.
@@ -105,7 +107,7 @@ The bot uses long polling. It does not need open ports or a reverse proxy. It on
    cp .env.example .env
    chmod 600 .env
    ```
-   Inside the Docker network, use the Vikunja service name and internal port, for example `http://vikunja:3456/api/v1/`.
+   Inside the Docker network, use the Vikunja service name, the internal port and the API v2 path, for example `http://vikunja:3456/api/v2/`.
 4. Build and start the bot:
    ```bash
    docker compose up -d --build
