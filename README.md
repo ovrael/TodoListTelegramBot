@@ -85,6 +85,39 @@ Never commit `.env` files. The `.gitignore` in this repository already excludes 
 dotnet run --project TodoListTelegramBot
 ```
 
+## Deployment with Docker Compose (next to Vikunja)
+
+The bot uses long polling. It does not need open ports or a reverse proxy. It only needs outgoing access to `api.telegram.org` and access to the Vikunja API.
+
+1. On the Docker host (for example, the LXC container with Vikunja), clone the repository:
+   ```bash
+   git clone <repo-url> /opt/todolist-telegram-bot
+   cd /opt/todolist-telegram-bot
+   ```
+2. Find the name of the Vikunja network and the Vikunja service name:
+   ```bash
+   docker network ls          # for example: vikunja_default
+   docker compose -f <vikunja-compose-file> config --services
+   ```
+   If the network name is different, change `name:` in `docker-compose.yml`.
+3. Create the `.env` file and fill in the values:
+   ```bash
+   cp .env.example .env
+   chmod 600 .env
+   ```
+   Inside the Docker network, use the Vikunja service name and internal port, for example `http://vikunja:3456/api/v1/`.
+4. Build and start the bot:
+   ```bash
+   docker compose up -d --build
+   docker compose logs -f
+   ```
+
+To update the bot:
+
+```bash
+git pull && docker compose up -d --build
+```
+
 ## Bot commands
 
 | Command | Description |

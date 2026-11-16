@@ -1,0 +1,21 @@
+services:
+  telegram-bot:
+    build: .
+    image: todolist-telegram-bot:latest
+    container_name: todolist-telegram-bot
+    restart: unless-stopped
+    env_file: .env
+    networks:
+      - vikunja
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  # Network created by the Vikunja docker compose project.
+  # Find the real name with: docker network ls
+  vikunja:
+    external: true
+    name: vikunja_default
