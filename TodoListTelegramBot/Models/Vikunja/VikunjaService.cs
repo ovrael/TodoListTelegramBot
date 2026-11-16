@@ -62,7 +62,9 @@ public class VikunjaService
     {
         var projects = await GetActiveProjects();
         return projects?.FirstOrDefault(p =>
-            string.Equals(p.Title, name, StringComparison.OrdinalIgnoreCase)
+            name.Length == 1
+                ? p.Title.StartsWith(name, StringComparison.OrdinalIgnoreCase)
+                : string.Equals(p.Title, name, StringComparison.OrdinalIgnoreCase)
         );
     }
 
@@ -80,20 +82,35 @@ public class VikunjaService
         return items.Deserialize<VikunjaTask[]>();
     }
 
-    internal async Task<bool> AddTask(long projectId, PostVikunjaTask task)
+    internal async Task<VikunjaTask?> AddTask(long projectId, PostVikunjaTask task)
     {
         var response = await client.PostAsJsonAsync($"projects/{projectId}/tasks", task);
         if (!response.IsSuccessStatusCode)
         {
-            System.Console.WriteLine(await response.Content.ReadAsStringAsync());
+            Console.WriteLine(await response.Content.ReadAsStringAsync());
+            return null;
+        }
+        return await response.Content.ReadFromJsonAsync<VikunjaTask>();
+    }
+
+    internal async Task<bool> AddAttachment(
+        long taskId,
+        Stream content,
+        string fileName,
+        string contentType
+    )
+    {
+        using var form = new MultipartFormDataContent();
+        var file = new StreamContent(content);
+        file.Headers.ContentType = new MediaTypeHeaderValue(contentType);
+        form.Add(file, "files", fileName);
+
+        var response = await client.PostAsync($"tasks/{taskId}/attachments", form);
+        if (!response.IsSuccessStatusCode)
+        {
+            Console.WriteLine(await response.Content.ReadAsStringAsync());
             return false;
         }
-
-        // string responseText = await response.Content.ReadAsStringAsync();
-
-        // using var document = JsonDocument.Parse(responseText);
-        // var root = document.RootElement;
-        // var items = root.GetProperty("items");
         return true;
     }
 }

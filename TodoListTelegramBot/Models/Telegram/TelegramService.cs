@@ -157,7 +157,7 @@ public class TelegramService
 
         System.Console.WriteLine($"Trying to add task to Project ({projectId})");
 
-        if (!await vikunjaService.AddTask(projectId, analysis.CreatePostTask()!))
+        if (await vikunjaService.AddTask(projectId, analysis.CreatePostTask()!) is null)
         {
             System.Console.WriteLine("Cannot create task!");
             await bot.SendMessage(
@@ -199,71 +199,52 @@ public class TelegramService
 
     async Task OnPhotoMessage(Message message)
     {
-        if (message.Photo is null)
+        if (message.Photo is not { Length: > 0 })
         {
-            System.Console.WriteLine(
-                $"Photo of message with type photo is null, suspicious and cannot be handled. Sets reaction to ({ReactionEmoji.ThinkingFace})."
-            );
-            await bot.SendMessage(
-                message.Chat.Id,
-                $"FAIL (more in logs), nothing was sent to Vikunja."
-            );
-            await bot.SetMessageReaction(message.Chat.Id, message.Id, [ReactionEmoji.ThinkingFace]);
-            return;
-        }
-        if (message.Photo.Length == 0)
-        {
-            System.Console.WriteLine(
-                $"Photo of message with type photo doesn't contain photos, suspicious and cannot be handled. Sets reaction to ({ReactionEmoji.ThinkingFace})."
-            );
-            await bot.SendMessage(
-                message.Chat.Id,
-                $"FAIL (more in logs), nothing was sent to Vikunja."
-            );
-
-            await bot.SetMessageReaction(message.Chat.Id, message.Id, [ReactionEmoji.ThinkingFace]);
+            await ReplyFail(message, "Photo message without photos.");
             return;
         }
 
-        var photo = message.Photo.OrderByDescending(p => p.Width * p.Height).FirstOrDefault();
-        if (photo is null)
+        var analysis = TextMessageAnalyzer.Analyze(message.Caption ?? string.Empty);
+        if (!analysis.IsValid)
         {
-            System.Console.WriteLine(
-                $"First photo of message with type photo is null, suspicious and cannot be handled. Sets reaction to ({ReactionEmoji.ThinkingFace})."
-            );
-            await bot.SendMessage(
-                message.Chat.Id,
-                $"FAIL (more in logs), nothing was sent to Vikunja."
-            );
-            await bot.SetMessageReaction(message.Chat.Id, message.Id, [ReactionEmoji.ThinkingFace]);
+            analysis.Text = $"Photo {DateTime.Now:yyyy-MM-dd HH:mm}";
+            analysis.IsValid = true;
+        }
+
+        long projectId = await ResolveProjectId(analysis.ProjectName);
+        var task = await vikunjaService.AddTask(projectId, analysis.CreatePostTask()!);
+        if (task is null)
+        {
+            await ReplyFail(message, "Cannot create task for photo.");
             return;
         }
 
-        var photoFile = await bot.GetFile(photo.FileId);
-        if (photoFile is null || string.IsNullOrEmpty(photoFile.FilePath))
-        {
-            System.Console.WriteLine(
-                $"First photo of message with type photo cannot be send, suspicious and cannot be handled. Sets reaction to ({ReactionEmoji.ThinkingFace})."
-            );
+        // Take max resolution
+        var photo = message.Photo.MaxBy(p => p.Width * p.Height)!;
 
+        using var stream = new MemoryStream();
+        await bot.GetInfoAndDownloadFile(photo, stream);
+        stream.Position = 0; // requied, otherwise the file will be empty
+
+        if (
+            !await vikunjaService.AddAttachment(
+                task.Id,
+                stream,
+                $"telegram_{message.Id}.jpg",
+                "image/jpeg"
+            )
+        )
+        {
+            Console.WriteLine($"Task {task.Id} created, but attachment upload failed.");
             await bot.SendMessage(
                 message.Chat.Id,
-                $"FAIL (more in logs), nothing was sent to Vikunja."
+                $"Task \"{task.Title}\" created, but the photo was not uploaded (more in logs)."
             );
             await bot.SetMessageReaction(message.Chat.Id, message.Id, [ReactionEmoji.ThinkingFace]);
             return;
         }
 
-        using (MemoryStream stream = new MemoryStream())
-        {
-            await bot.DownloadFile(photoFile.FilePath, stream);
-            await File.WriteAllBytesAsync("test.png", stream.GetBuffer());
-        }
-
-        await bot.SendMessage(
-            message.Chat.Id,
-            $"Photo message sent to Vikunja's board PHOTOS. Sets reaction to ({ReactionEmoji.OkHand})."
-        );
         await bot.SetMessageReaction(message.Chat.Id, message.Id, [ReactionEmoji.OkHand]);
     }
 
@@ -278,5 +259,29 @@ public class TelegramService
         );
 
         await bot.SetMessageReaction(message.Chat.Id, message.Id, [ReactionEmoji.PileOfPoo]);
+    }
+
+    async Task<long> ResolveProjectId(string? projectName)
+    {
+        if (projectName is not null)
+        {
+            var project = await vikunjaService.FindProjectByName(projectName);
+            if (project is not null)
+                return project.Id;
+
+            Console.WriteLine(
+                $"Cannot find project with name {projectName}, using default project"
+            );
+        }
+
+        var settings = await vikunjaService.GetUserSettings();
+        return settings?.DefaultProjectId ?? 0;
+    }
+
+    async Task ReplyFail(Message message, string log)
+    {
+        Console.WriteLine(log);
+        await bot.SendMessage(message.Chat.Id, "FAIL (more in logs), nothing was sent to Vikunja.");
+        await bot.SetMessageReaction(message.Chat.Id, message.Id, [ReactionEmoji.ThinkingFace]);
     }
 }
