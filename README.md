@@ -2,7 +2,7 @@
 
 A Telegram bot that connects to a self-hosted [Vikunja](https://vikunja.io/) instance. It lets you browse your Vikunja projects and tasks from a private Telegram chat.
 
-> **Note:** The bot is written for the **Vikunja API v2** (`/api/v2/`). It does not support API v1.
+> **Note:** The bot is written for the **Vikunja API v2** (`/api/v2/`). It does not support API v1. The bot adds the `/api/v2/` path to the configured server address itself.
 
 ## Requirements
 
@@ -16,7 +16,7 @@ The bot does not keep any secrets in the source code. It reads all values from c
 
 | Key | Environment variable | Required | Description |
 |---|---|---|---|
-| `Vikunja:Uri` | `Vikunja__Uri` | Yes | Base URL of the Vikunja API v2, including the `/api/v2/` path and a trailing slash. Example: `https://vikunja.example.com/api/v2/` |
+| `Vikunja:Uri` | `Vikunja__Uri` | Yes | Address of the Vikunja server, without the API path. The bot adds `/api/v2/` itself. Example: `https://vikunja.example.com` |
 | `Vikunja:Token` | `Vikunja__Token` | Yes | Vikunja API token. Starts with `tk_`. |
 | `Telegram:Token` | `Telegram__Token` | Yes | Telegram bot token from @BotFather. Format: `123456789:ABC...` |
 | `Telegram:AllowedUserIds` | `Telegram__AllowedUserIds` | Yes | Comma-separated list of numeric Telegram user IDs that can use the bot. Example: `123456789,987654321` |
@@ -24,7 +24,11 @@ The bot does not keep any secrets in the source code. It reads all values from c
 ### How to get the values
 
 **`Vikunja:Uri`**
-Use the address of your Vikunja server with the API v2 path (`/api/v2/`). The bot does not work with `/api/v1/`. The trailing slash (`/`) is required.
+Use only the address of your Vikunja server (scheme, host and, if necessary, port). Do not add the API path. The bot adds `/api/v2/` itself, so `https://vikunja.example.com` becomes `https://vikunja.example.com/api/v2/`. A trailing slash is optional.
+
+If Vikunja runs under a subpath, include it, for example `https://example.com/vikunja`.
+
+If the address already contains `/api/`, the bot stops at startup with an error. At startup the bot writes the full API address to the console (`Vikunja API address: ...`).
 
 **`Vikunja:Token`**
 1. In Vikunja, open **Settings → API Tokens**.
@@ -53,7 +57,7 @@ User Secrets are stored outside the project directory (`~/.microsoft/usersecrets
 
 ```bash
 cd TodoListTelegramBot
-dotnet user-secrets set "Vikunja:Uri" "https://vikunja.example.com/api/v2/"
+dotnet user-secrets set "Vikunja:Uri" "https://vikunja.example.com"
 dotnet user-secrets set "Vikunja:Token" "tk_..."
 dotnet user-secrets set "Telegram:Token" "123456789:ABC..."
 dotnet user-secrets set "Telegram:AllowedUserIds" "123456789"
@@ -70,7 +74,7 @@ dotnet user-secrets list
 Use a double underscore (`__`) instead of a colon (`:`) in the key names:
 
 ```bash
-Vikunja__Uri=https://vikunja.example.com/api/v2/
+Vikunja__Uri=https://vikunja.example.com
 Vikunja__Token=tk_...
 Telegram__Token=123456789:ABC...
 Telegram__AllowedUserIds=123456789
@@ -107,7 +111,7 @@ The bot uses long polling. It does not need open ports or a reverse proxy. It on
    cp .env.example .env
    chmod 600 .env
    ```
-   Inside the Docker network, use the Vikunja service name, the internal port and the API v2 path, for example `http://vikunja:3456/api/v2/`.
+   Inside the Docker network, use the Vikunja service name and the internal port, without the API path, for example `http://vikunja:3456`. The bot adds `/api/v2/` itself.
 4. Build and start the bot:
    ```bash
    docker compose up -d --build

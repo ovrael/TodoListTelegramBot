@@ -4,14 +4,32 @@ using System.Text.Json;
 
 public class VikunjaService
 {
+    // The bot is written for the Vikunja API v2
+    private const string ApiPath = "api/v2/";
+
     private HttpClient client;
 
-    public VikunjaService(string uri, string token)
+    /// <param name="serverUri">Vikunja server address without the API path, e.g. https://vikunja.example.com</param>
+    public VikunjaService(string serverUri, string token)
     {
         System.Console.WriteLine("Initializing Vikunja connection");
         client = new HttpClient();
-        client.BaseAddress = new Uri(uri);
+        client.BaseAddress = BuildApiUri(serverUri);
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        System.Console.WriteLine($"Vikunja API address: {client.BaseAddress}");
+    }
+
+    private static Uri BuildApiUri(string serverUri)
+    {
+        var baseUri = new Uri(serverUri.TrimEnd('/') + "/", UriKind.Absolute);
+
+        if (baseUri.AbsolutePath.Contains("/api/", StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException(
+                $"Vikunja:Uri must be the server address without the API path (got '{serverUri}'). "
+                    + $"The bot adds '/{ApiPath}' itself."
+            );
+
+        return new Uri(baseUri, ApiPath);
     }
 
     public async Task<string?> GetUser()

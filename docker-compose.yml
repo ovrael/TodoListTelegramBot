@@ -4,7 +4,8 @@ services:
     image: todolist-telegram-bot:latest
     container_name: todolist-telegram-bot
     restart: unless-stopped
-    # Vikunja__Uri in .env must point to the Vikunja API v2 (/api/v2/)
+    # Vikunja__Uri in .env is the server address only (e.g. http://vikunja:3456).
+    # The bot adds the Vikunja API v2 path (/api/v2/) itself.
     env_file: .env
     networks:
       - vikunja
