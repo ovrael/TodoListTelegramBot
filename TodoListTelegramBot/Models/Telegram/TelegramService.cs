@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using Telegram.Bot;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
@@ -7,6 +8,9 @@ public class TelegramService
     private readonly TelegramBotClient bot;
 
     private readonly Command[] commands = [];
+
+    // Chat id -> handler for the next text message in this chat (e.g. a reply to a question from the bot)
+    private readonly ConcurrentDictionary<long, Func<Message, Task>> pendingReplies = new();
 
     private readonly VikunjaService vikunjaService;
     private readonly IReadOnlySet<long> allowedUserIds;
@@ -69,7 +73,60 @@ public class TelegramService
                 "List current Vikunja tasks from oldest to newest",
                 CommandList.OnTasks
             ),
+            new Command(
+                "/create_project",
+                "Create a Vikunja project: /create_project NAME",
+                (_, _, msg) => OnCreateProject(msg)
+            ),
         ];
+    }
+
+    async Task OnCreateProject(Message message)
+    {
+        string? name = GetCommandArgument(message.Text!);
+        if (name is not null)
+        {
+            await CreateProject(message, name);
+            return;
+        }
+
+        pendingReplies[message.Chat.Id] = async reply =>
+        {
+            string replyName = reply.Text!.Trim();
+            if (replyName.Length == 0)
+            {
+                await bot.SendMessage(reply.Chat.Id, "Project name is empty. Nothing was created.");
+                return;
+            }
+            await CreateProject(reply, replyName);
+        };
+
+        await bot.SendMessage(message.Chat.Id, "Send the name of the new project.");
+    }
+
+    async Task CreateProject(Message message, string name)
+    {
+        Console.WriteLine($"Trying to create project \"{name}\"");
+        var project = await vikunjaService.CreateProject(name);
+        if (project is null)
+        {
+            await ReplyFail(message, $"Cannot create project \"{name}\".");
+            return;
+        }
+
+        Console.WriteLine($"Project created ({project.Id})");
+        await bot.SendMessage(message.Chat.Id, $"Project \"{project.Title}\" created.");
+        await bot.SetMessageReaction(message.Chat.Id, message.Id, [ReactionEmoji.OkHand]);
+    }
+
+    // "/cmd@BotName rest of text" -> "/cmd"
+    static string GetCommandName(string text) => text.Split(' ', 2)[0].Split('@', 2)[0];
+
+    // "/cmd rest of text" -> "rest of text", null if there is no argument
+    static string? GetCommandArgument(string text)
+    {
+        var parts = text.Split(' ', 2, StringSplitOptions.TrimEntries);
+        return parts.Length > 1 && parts[1].Length > 0 ? parts[1] : null;
     }
 
     async Task OnTelegramMessage(Message message, UpdateType updateType)
@@ -110,6 +167,13 @@ public class TelegramService
                 $"FAIL (more in logs), nothing was sent to Vikunja."
             );
             await bot.SetMessageReaction(message.Chat.Id, message.Id, [ReactionEmoji.ThinkingFace]);
+            return;
+        }
+
+        // A new command cancels the question the bot asked before
+        if (pendingReplies.TryRemove(message.Chat.Id, out var pendingReply) && !text.StartsWith('/'))
+        {
+            await pendingReply(message);
             return;
         }
 
@@ -181,7 +245,8 @@ public class TelegramService
     {
         System.Console.WriteLine($"Received command: {message.Text!}");
 
-        var command = commands.FirstOrDefault(c => c.CommandText == message.Text!);
+        string commandName = GetCommandName(message.Text!);
+        var command = commands.FirstOrDefault(c => c.CommandText == commandName);
         if (command is null)
         {
             System.Console.WriteLine($"Unknown command: {command}");

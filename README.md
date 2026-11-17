@@ -131,6 +131,7 @@ git pull && docker compose up -d --build
 | `/projects` | List Vikunja projects |
 | `/tasks` | List tasks from newest to oldest |
 | `/tasks-newest` | List tasks from oldest to newest |
+| `/create_project NAME` | Create a Vikunja project with the name `NAME`. If you do not give a name, the bot asks for it and creates the project from your next message. A new command cancels the question. |
 
 ## Security notes
 

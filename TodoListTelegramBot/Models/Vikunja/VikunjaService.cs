@@ -86,6 +86,17 @@ public class VikunjaService
         );
     }
 
+    internal async Task<Project?> CreateProject(string title)
+    {
+        var response = await client.PostAsJsonAsync("projects", new { title });
+        if (!response.IsSuccessStatusCode)
+        {
+            Console.WriteLine(await response.Content.ReadAsStringAsync());
+            return null;
+        }
+        return await response.Content.ReadFromJsonAsync<Project>();
+    }
+
     internal async Task<VikunjaTask[]?> GetTasks()
     {
         var response = await client.GetAsync("tasks");
