@@ -124,6 +124,26 @@ To update the bot:
 git pull && docker compose up -d --build
 ```
 
+## Creating tasks
+
+Send a text message (or a photo with a caption) to the bot. The bot creates a task from it. These markers are found only at the start of the message or after a space:
+
+| Marker | Meaning | Example |
+|---|---|---|
+| `#name` | Project. One letter finds the first project that starts with it. | `#zakupy` |
+| `$name` | Subproject. With `#`, the bot finds it only in that project. Without `#`, the bot finds it in any project. One letter works as for `#`. | `$owoce` |
+| `@date` | Due date | `@jutro` |
+| `!1`–`!5` | Priority | `!3` |
+
+To use a marker character as normal text, put a backslash (`\`) before it: `\#`, `\@`, `\!`, `\$`. The bot removes the backslash and does not read the text as a marker.
+
+If the bot cannot find the subproject, it uses the project from `#`. If it cannot find the project, it uses your default Vikunja project.
+
+Examples:
+- `Mandarynka #zakupy $owoce` creates the task `Mandarynka` in the subproject `owoce` of the project `zakupy`.
+- `Mandarynka #zakupy \#zdrowe` creates the task `Mandarynka #zdrowe` in the project `zakupy`.
+- `Kawa za \$5` creates the task `Kawa za $5`. Without the backslash, the bot reads `$5` as a subproject.
+
 ## Bot commands
 
 | Command | Description |

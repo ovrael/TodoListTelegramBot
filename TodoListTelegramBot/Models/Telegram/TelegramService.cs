@@ -194,30 +194,7 @@ public class TelegramService
             return;
         }
 
-        long projectId;
-        if (analysis.ProjectName is null)
-        {
-            System.Console.WriteLine(
-                "No project name in massage, set to default user project or 0"
-            );
-            // No #project in message, get default project id
-            var settings = await vikunjaService.GetUserSettings();
-            projectId = settings?.DefaultProjectId ?? 0;
-        }
-        else
-        {
-            var project = await vikunjaService.FindProjectByName(analysis.ProjectName);
-            if (project is null)
-            {
-                System.Console.WriteLine(
-                    $"Cannot find project with name {analysis.ProjectName}, set to default user project or 0"
-                );
-                var settings = await vikunjaService.GetUserSettings();
-                projectId = settings?.DefaultProjectId ?? 0;
-            }
-            else
-                projectId = project.Id;
-        }
+        long projectId = await ResolveProjectId(analysis.ProjectName, analysis.SubprojectName);
 
         System.Console.WriteLine($"Trying to add task to Project ({projectId})");
 
@@ -277,7 +254,7 @@ public class TelegramService
             analysis.IsValid = true;
         }
 
-        long projectId = await ResolveProjectId(analysis.ProjectName);
+        long projectId = await ResolveProjectId(analysis.ProjectName, analysis.SubprojectName);
         var task = await vikunjaService.AddTask(projectId, analysis.CreatePostTask()!);
         if (task is null)
         {
@@ -326,19 +303,42 @@ public class TelegramService
         await bot.SetMessageReaction(message.Chat.Id, message.Id, [ReactionEmoji.PileOfPoo]);
     }
 
-    async Task<long> ResolveProjectId(string? projectName)
+    /// <summary>
+    /// #project $subproject -> subproject of this project, else the project.
+    /// $subproject only     -> subproject with this name in any project.
+    /// #project only        -> the project.
+    /// Nothing found        -> default project of the user (or 0).
+    /// </summary>
+    async Task<long> ResolveProjectId(string? projectName, string? subprojectName)
     {
+        Project? project = null;
         if (projectName is not null)
         {
-            var project = await vikunjaService.FindProjectByName(projectName);
-            if (project is not null)
-                return project.Id;
+            project = await vikunjaService.FindProjectByName(projectName);
+            if (project is null)
+                Console.WriteLine($"Cannot find project with name {projectName}");
+        }
+
+        if (subprojectName is not null)
+        {
+            var subproject = await vikunjaService.FindSubprojectByName(
+                subprojectName,
+                project?.Id
+            );
+            if (subproject is not null)
+                return subproject.Id;
 
             Console.WriteLine(
-                $"Cannot find project with name {projectName}, using default project"
+                project is null
+                    ? $"Cannot find subproject with name {subprojectName}"
+                    : $"Cannot find subproject with name {subprojectName} in project {project.Title}"
             );
         }
 
+        if (project is not null)
+            return project.Id;
+
+        Console.WriteLine("Using default project");
         var settings = await vikunjaService.GetUserSettings();
         return settings?.DefaultProjectId ?? 0;
     }

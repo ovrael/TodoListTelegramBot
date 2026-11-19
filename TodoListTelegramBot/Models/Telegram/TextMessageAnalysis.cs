@@ -1,6 +1,7 @@
 public class TextMessageAnalysis
 {
     public string? ProjectName { get; set; }
+    public string? SubprojectName { get; set; }
     public string? Date { get; set; }
     public string? Priority { get; set; }
     public string? Text { get; set; }

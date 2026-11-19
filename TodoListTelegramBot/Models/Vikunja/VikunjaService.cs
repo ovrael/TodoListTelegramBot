@@ -53,18 +53,38 @@ public class VikunjaService
         return settings.Deserialize<UserSettings>();
     }
 
+    /// <summary>
+    /// Gets all pages of projects. The list includes subprojects and excludes archived projects.
+    /// </summary>
     public async Task<Project[]?> GetProjects()
     {
-        var response = await client.GetAsync("projects");
-        if (response.StatusCode != System.Net.HttpStatusCode.OK)
-            return null;
+        var projects = new List<Project>();
+        int totalPages = 1;
 
-        string responseText = await response.Content.ReadAsStringAsync();
+        for (int page = 1; page <= totalPages; page++)
+        {
+            var response = await client.GetAsync($"projects?page={page}");
+            if (response.StatusCode != System.Net.HttpStatusCode.OK)
+                return null;
 
-        using var document = JsonDocument.Parse(responseText);
-        var root = document.RootElement;
-        var items = root.GetProperty("items");
-        return items.Deserialize<Project[]>();
+            string responseText = await response.Content.ReadAsStringAsync();
+
+            using var document = JsonDocument.Parse(responseText);
+            var root = document.RootElement;
+
+            // API v2 sends "items": null when the list is empty
+            var items = root.GetProperty("items");
+            if (items.ValueKind == JsonValueKind.Array)
+                projects.AddRange(items.Deserialize<Project[]>() ?? []);
+
+            totalPages =
+                root.TryGetProperty("total_pages", out var pages)
+                && pages.ValueKind == JsonValueKind.Number
+                    ? pages.GetInt32()
+                    : 1;
+        }
+
+        return projects.ToArray();
     }
 
     public async Task<Project[]?> GetActiveProjects()
@@ -76,13 +96,29 @@ public class VikunjaService
         return projects.Where(p => !p.IsArchived).ToArray();
     }
 
+    // One letter: the title starts with it. Longer name: the full title (case-insensitive).
+    private static bool NameMatches(Project project, string name) =>
+        name.Length == 1
+            ? project.Title.StartsWith(name, StringComparison.OrdinalIgnoreCase)
+            : string.Equals(project.Title, name, StringComparison.OrdinalIgnoreCase);
+
     public async Task<Project?> FindProjectByName(string name)
     {
         var projects = await GetActiveProjects();
+        return projects?.FirstOrDefault(p => NameMatches(p, name));
+    }
+
+    /// <summary>
+    /// Finds a subproject by name. If parentId is set, finds only direct children of that project.
+    /// If parentId is null, finds a subproject with this name in any project.
+    /// </summary>
+    public async Task<Project?> FindSubprojectByName(string name, long? parentId)
+    {
+        var projects = await GetActiveProjects();
         return projects?.FirstOrDefault(p =>
-            name.Length == 1
-                ? p.Title.StartsWith(name, StringComparison.OrdinalIgnoreCase)
-                : string.Equals(p.Title, name, StringComparison.OrdinalIgnoreCase)
+            p.IsSubproject
+            && (parentId is null || p.ParentProjectId == parentId)
+            && NameMatches(p, name)
         );
     }
 
